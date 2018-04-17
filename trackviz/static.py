@@ -1,9 +1,12 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import Divider, LocatableAxes, Size
-from matplotlib.colors import Normalize
 from matplotlib.collections import LineCollection
-import seaborn as sns
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from mpl_toolkits.mplot3d import Axes3D
+
+import trackviz.tools
 
 
 class FigureAxes:
@@ -31,7 +34,7 @@ class FigureAxes:
         Figure instance.
     ax : matplotlib Axes
         Main axes in figure.
-    ax_cbar : matplotlib Axes
+    cax : matplotlib Axes
         Axes for colorbar. Will be None if `cbar` was False.
     """
     def __init__(self, ax_size, wspace, dpi, cbar, cbar_width, left, bottom, right, top):
@@ -56,13 +59,13 @@ class FigureAxes:
         fig.add_axes(ax)
 
         if cbar:
-            ax_cbar = LocatableAxes(fig, divider.get_position())
-            ax_cbar.set_axes_locator(divider.new_locator(nx=3, ny=1))
-            fig.add_axes(ax_cbar)
+            cax = LocatableAxes(fig, divider.get_position())
+            cax.set_axes_locator(divider.new_locator(nx=3, ny=1))
+            fig.add_axes(cax)
 
         self.fig = fig
         self.ax = ax
-        self.ax_cbar = ax_cbar if cbar else None
+        self.cax = cax if cbar else None
 
 
 # TODO: Rather than tracks being a (N, L, 3) array where all the tracks must have the same
@@ -71,23 +74,19 @@ def trajectory_2d(
     tracks,
     image=None,
     labels=None,
+    color='z',
     xlim=None, ylim=None,
-    vmin=None, vmax=None,
     cmap=None,
-    cbar=True,
+    cbar=False,
     cbar_width=30,
     show_points=False,
     line_kws=None,
     scat_kws=None,
-    dpi=100,
+    dpi=None,
     scale=1.
 ):
     """
     2d plot of trajectories.
-
-    If `labels` is not None, each trajectory will be colored according to its label. If `labels` is
-    not None, `vmin`, `vmax`, cmap`, and `cbar` will be ignored. If no `labels` are specified, each
-    trajectory point will be colored based on its z value.
 
     Parameters
     ----------
@@ -97,16 +96,16 @@ def trajectory_2d(
         Image to plot in background.
     labels : ndarray, shape (N,), optional
         Trajectory labels. Will be used to color trajectories.
+    color : {'z', 'label', None}
+        Value(s) used to color trajectories. If `color` == 'z', color each line segment of each trajectory according
+        to its z value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
+        color the trajectories.
     xlim, ylim : array_like, shape (2,) optional
-        Data limits for the x and y axis. If no limits are given, they will be computed
-        so that the trajectories, as well as the image (if it is used), fit into the limits.
-    vmin, vmax : floats, optional
-        Values to anchor the colormap. If None, they will be inferred from the data. Ignored
-        if `labels` is not None.
+        Data limits for the x and y axis. If no limits are given, they will be computed from the data.
     cmap : matplotlib colormap name or object, optional
-        Colormap used to map z coordinates to colors. Ignored if `labels` is not None.
+        Colormap used to map z coordinates to colors.
     cbar : bool, optional
-        Whether to draw a colorbar. Ignored if `labels` is not None.
+        Whether to draw a colorbar. Must be False if `color` == None, because no colormapping is used.
     cbar_width : int
         Width of colorbar (in pixels).
     show_points : bool, optional
@@ -115,8 +114,8 @@ def trajectory_2d(
         Keyword arguments for matplotlib.collection.LineCollection.
     scat_kws : dict, optional
         Keyword arguments for ax.scatter.
-    dpi : int, optional
-        Dots per inch.
+    dpi : int or None, optional
+        Figure dots per inch. If None, default to matplotlib.rcParams['figure.dpi'].
     scale : float, optional
         Output size scale.
 
@@ -129,6 +128,8 @@ def trajectory_2d(
     """
     if not (tracks.ndim == 3 and tracks.shape[-1] == 3):
         raise ValueError('tracks must be a (N, L, 3) array')
+    if tracks.shape[0] < 1:
+        raise ValueError('tracks has zero length')
     if image is not None:
         if not (image.ndim == 2 or image.ndim == 3):
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
@@ -136,13 +137,21 @@ def trajectory_2d(
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
     if labels is not None and labels.shape != (len(tracks),):
         raise ValueError('labels must have shape ({},)'.format(len(tracks)))
-    if labels is not None and cbar:
-        raise ValueError('cbar must be False if labels are passed')
+    if color not in ('z', 'label', None):
+        raise ValueError('color must be "z", "label", or None')
+    if color == 'label' and labels is None:
+        raise ValueError('labels cannot be None if color == "label"')
+    if color is None and cbar:
+        raise ValueError('cbar must be False when color == None')
+
+    dpi = matplotlib.rcParams['figure.dpi'] if dpi is None else dpi
+    cmap = 'viridis' if cmap is None else cmap
 
     line_kws = {} if line_kws is None else line_kws.copy()
     line_kws.setdefault('linewidths', 1.5)
     line_kws.setdefault('alpha', 0.8)
     line_kws.setdefault('zorder', 1)
+
     scat_kws = {} if scat_kws is None else scat_kws.copy()
     scat_kws.setdefault('zorder', 2)
     scat_kws.setdefault('s', 0.5)
@@ -171,32 +180,164 @@ def trajectory_2d(
     grid.ax.set_xlim(xlim)
     grid.ax.set_ylim(ylim[::-1])   # invert y axis
 
-    # set color based on either labels or the z values
-    if labels is not None:
-        unique = np.unique(labels)
-        # label_colors = dict(zip(unique, sns.husl_palette(len(unique))))
-        label_colors = dict(zip(unique, sns.color_palette("Set2", len(unique))))
-        colors = [label_colors[c] for c in labels]
-
-        lc = LineCollection(tracks[:, :, :2], colors=colors, **line_kws)
+    # draw lines
+    if color == 'label':
+        linedata = tracks[:, :, :2]
+        colordata = labels
+        # TODO: Check that labels are strictly increasing and ints
+        labels_unique = np.unique(labels)
+        N = len(labels_unique)
+        line_kws['cmap'] = plt.get_cmap(cmap, N)
+    elif color == 'z':
+        segments = trackviz.tools.tracks_to_segments(tracks)
+        linedata = segments[:, :, :2]
+        colordata = segments[:, 0, 2]
+        line_kws['cmap'] = cmap
     else:
-        vmin = tracks[:, :, 2].min() if vmin is None else vmin
-        vmax = tracks[:, :, 2].max() if vmax is None else vmax
-        norm = Normalize(vmin, vmax)
+        linedata = tracks[:, :, :2]
+        colordata = None
 
-        points = tracks[:, :, None, :]
-        segments = np.concatenate((points[:, :-1], points[:, 1:]), axis=2)
-        segments = segments.reshape(-1, 2, 3)
-
-        lc = LineCollection(segments[:, :, :2], cmap=cmap, norm=norm, **line_kws)
-        lc.set_array(segments[:, 0, 2])
-
-        if cbar:
-            cb = grid.ax.figure.colorbar(lc, cax=grid.ax_cbar)
-
+    lc = LineCollection(linedata, **line_kws)
+    if colordata is not None:
+        lc.set_array(colordata)
     grid.ax.add_collection(lc)
 
+    # draw points
     if show_points:
         grid.ax.scatter(tracks[:, :, 0], tracks[:, :, 1], **scat_kws)
 
+    # draw colorbar
+    if cbar and color == 'label':
+        # see https://gist.github.com/jakevdp/91077b0cae40f8f8244a
+        cb = grid.ax.figure.colorbar(lc, cax=grid.cax, ticks=range(N))
+        lc.set_clim(-0.5, N - 0.5)
+    elif cbar and color == 'z':
+        cb = grid.ax.figure.colorbar(lc, cax=grid.cax)
+
     return grid.fig, grid.ax
+
+
+# TODO: Add ability to draw colorbar
+# TODO: Better solution for setting aspect ratio of Axes that doesn't change range
+# TODO: Add show_points parameter
+def trajectory_3d(
+    tracks,
+    labels=None,
+    color='z',
+    xlim=None, ylim=None, zlim=None,
+    cmap=None,
+    line_kws=None,
+):
+    """
+    3d plot of trajectories.
+
+    Parameters
+    ----------
+    tracks : ndarray, shape (N, L, 3)
+        Trajectory coordinates. There are N tracks, where each track has L (x, y, z) points.
+    labels : ndarray, shape (N,), dtype int, optional
+        Trajectory labels. Will be used to color trajectories.
+    color : {'z', 'label', None}
+        Value(s) used to color trajectories. If `color` == 'z', color each line segment of each trajectory according
+        to its z value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
+        color the trajectories.
+    xlim, ylim, zlim : list, shape (2,) optional
+        Data limits for the x, y, and z axis. If no limits are given, they will be computed from the data.
+    cmap : matplotlib colormap name or object, optional
+        Colormap used to map z coordinates to colors. Ignored if `labels` is not None.
+    line_kws : dict, optional
+        Keyword arguments passed to matplotlib LineCollection.
+
+    Returns
+    -------
+    figure : matplotlib Figure
+        Figure containing trajectory plot.
+    axes : matplotlib Axes
+        Axes on which the trajectories are plotted.
+    """
+    if not (tracks.ndim == 3 and tracks.shape[-1] == 3):
+        raise ValueError('tracks must be a (N, L, 3) array')
+    if tracks.shape[0] < 1:
+        raise ValueError('tracks has zero length')
+    if labels is not None and labels.shape != (len(tracks),):
+        raise ValueError('labels must have same length as tracks ({},)'.format(len(tracks)))
+    if color not in ('z', 'label', None):
+        raise ValueError('color must be "z", "label", or None')
+    if color == 'label' and labels is None:
+        raise ValueError('labels cannot be None if color == "label"')
+
+    X = tracks[:, :, 0]
+    Y = tracks[:, :, 1]
+    Z = tracks[:, :, 2]
+
+    line_kws = {} if line_kws is None else line_kws.copy()
+    cmap = 'viridis' if cmap is None else cmap
+
+    # compute axis limits
+    xlim = xlim if xlim else [np.floor(X.min()), np.ceil(X.max())]
+    ylim = ylim if ylim else [np.floor(Y.min()), np.ceil(Y.max())][::-1]  # invert y axis
+    zlim = zlim if zlim else [np.floor(Z.min()), np.ceil(Z.max())]
+
+    fig = plt.figure()
+    ax = fig.add_axes((0, 0, 1, 1), projection='3d')
+
+    ax.set_xlim3d(xlim)
+    ax.set_ylim3d(ylim)
+    ax.set_zlim3d(zlim)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    if color == 'label':
+        linedata = tracks
+        colordata = labels
+        # TODO: Check that labels are strictly increasing and ints
+        N = len(np.unique(labels))
+        line_kws['cmap'] = plt.get_cmap(cmap, N)
+    elif color == 'z':
+        linedata = trackviz.tools.tracks_to_segments(tracks)
+        colordata = linedata[:, 0, 2]
+        line_kws['cmap'] = cmap
+    else:
+        linedata = tracks
+        colordata = None
+
+    lc = Line3DCollection(linedata, **line_kws)
+    if colordata is not None:
+        lc.set_array(colordata)
+    ax.add_collection3d(lc)
+
+    # set aspect
+    ax.set_aspect('equal')  # will set aspect for x and y axes
+    # _set_axes_equal(ax)
+
+    return fig, ax
+
+
+def _set_axes_equal(ax):
+    """
+    This was copied from stackoverflow here: https://stackoverflow.com/a/31364297
+
+    Make axes of 3D plot have equal scale so that spheres appear as spheres,
+    cubes as cubes, etc..  This is one possible solution to Matplotlib's
+    ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
+    """
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    x_range = abs(x_limits[1] - x_limits[0])
+    x_middle = np.mean(x_limits)
+    y_range = abs(y_limits[1] - y_limits[0])
+    y_middle = np.mean(y_limits)
+    z_range = abs(z_limits[1] - z_limits[0])
+    z_middle = np.mean(z_limits)
+
+    # The plot bounding box is a sphere in the sense of the infinity
+    # norm, hence I call half the max range the plot radius.
+    plot_radius = 0.5*max([x_range, y_range, z_range])
+
+    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
