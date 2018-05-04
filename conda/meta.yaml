@@ -1,0 +1,37 @@
+{% set name = "trackviz" %}
+{% set version = "0.1" %}
+{% set user = "marximus" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  fn: {{ name }}-master.tar.gz
+  url: https://api.github.com/repos/{{ user }}/{{ name }}/tarball/master
+
+build:
+  script: python -m pip install --no-deps --ignore-installed .
+  number: 0
+
+requirements:
+  build:
+    - python
+    - pip
+  run:
+    - python
+    - ffmpeg
+    - imageio
+    - matplotlib
+    - seaborn
+    - jupyter
+
+test:
+  imports:
+    - trackviz
+
+about:
+  home: https://github.com/marximus/trackviz
+  license: MIT
+  license_file: LICENSE
+  summary: Python trajectory visualization library
