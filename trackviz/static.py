@@ -1,80 +1,23 @@
 import numpy as np
+import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import Divider, LocatableAxes, Size
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import ListedColormap, BoundaryNorm
+
 
 import trackviz.tools
+from trackviz.tools import FigureAxes
 
 
-class FigureAxes:
-    """
-    Create a figure around a fixed size Axes with a dimension defined in pixels.
-
-    Parameters
-    ----------
-    ax_size : tuple, (width, height)
-        Width and height of Axes (in pixels).
-    wspace : int
-        Space between colorbar and main Axes (in pixels).
-    cbar : bool
-        If True, create an Axes for a colorbar.
-    cbar_width : int
-        Width of colorbar (in pixels).
-    dpi : int
-        Dots per inch.
-    left, bottom, right, top : int
-        Margin between plot elements and figure (in pixels).
-
-    Attributes
-    ----------
-    fig : matplotlib Figure
-        Figure instance.
-    ax : matplotlib Axes
-        Main axes in figure.
-    cax : matplotlib Axes
-        Axes for colorbar. Will be None if `cbar` was False.
-    """
-    def __init__(self, ax_size, wspace, dpi, cbar, cbar_width, left, bottom, right, top):
-        if not cbar:
-            cbar_width = 0
-
-        # convert arguments from pixels to inches
-        ax_size = np.asarray(ax_size) / dpi
-        wspace, cbar_width, left, bottom, right, top = np.array((wspace, cbar_width, left, bottom, right, top)) / dpi
-
-        horiz = [left, ax_size[0], wspace, cbar_width, right]
-        vert = [bottom, ax_size[1], top]
-
-        figsize = (sum(horiz), sum(vert))
-        fig = plt.figure(figsize=figsize, dpi=dpi, frameon=True)
-
-        horiz, vert = list(map(Size.Fixed, horiz)), list(map(Size.Fixed, vert))
-        divider = Divider(fig, (0.0, 0.0, 1., 1.), horiz, vert, aspect=False)
-
-        ax = LocatableAxes(fig, divider.get_position())
-        ax.set_axes_locator(divider.new_locator(nx=1, ny=1))
-        fig.add_axes(ax)
-
-        if cbar:
-            cax = LocatableAxes(fig, divider.get_position())
-            cax.set_axes_locator(divider.new_locator(nx=3, ny=1))
-            fig.add_axes(cax)
-
-        self.fig = fig
-        self.ax = ax
-        self.cax = cax if cbar else None
-
-
-# TODO: Rather than tracks being a (N, L, 3) array where all the tracks must have the same
-# TODO: length, use a pandas.DataFrame with columns (x, y, frame_num, track_id) or (x, y, z, track_id).
 def trajectory_2d(
     tracks,
     image=None,
     labels=None,
-    color='z',
+    color=None,
     xlim=None, ylim=None,
     cmap=None,
     cbar=False,
@@ -82,6 +25,7 @@ def trajectory_2d(
     show_points=False,
     line_kws=None,
     scat_kws=None,
+    im_kws=None,
     dpi=None,
     scale=1.
 ):
@@ -90,20 +34,21 @@ def trajectory_2d(
 
     Parameters
     ----------
-    tracks : ndarray, shape (N, L, 3)
-        Trajectory coordinates. There are N tracks, where each track has L (x, y, z) points.
+    tracks : pandas.DataFrame, columns (x, y, t, trackid)
+        Trajectory data. Each row in `tracks` is a point in a trajectory, where each trajectory has a unique trackid.
     image : ndarray, shape (H, W) or (H, W, 3) or (H, W, 4), optional
         Image to plot in background.
-    labels : ndarray, shape (N,), optional
-        Trajectory labels. Will be used to color trajectories.
-    color : {'z', 'label', None}
-        Value(s) used to color trajectories. If `color` == 'z', color each line segment of each trajectory according
-        to its z value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
+    labels : pandas.DataFrame, columns (trackid, label)
+        Trajectory labels used to color trajectories if `color` == `label`. There must be a label for each trajectory
+        in `tracks`. Can contain integers or strings.
+    color : {None, 't', 'label'}
+        Determines how trajectories are colored. If `color` == 't', color each line segment of each trajectory according
+        to its t value. If `color` == 'label', color each trajectory based on its label. If `color` == None, do not
         color the trajectories.
     xlim, ylim : array_like, shape (2,) optional
         Data limits for the x and y axis. If no limits are given, they will be computed from the data.
     cmap : matplotlib colormap name or object, optional
-        Colormap used to map z coordinates to colors.
+        Colormap used to map t coordinates to colors.
     cbar : bool, optional
         Whether to draw a colorbar. Must be False if `color` == None, because no colormapping is used.
     cbar_width : int
@@ -114,6 +59,8 @@ def trajectory_2d(
         Keyword arguments for matplotlib.collection.LineCollection.
     scat_kws : dict, optional
         Keyword arguments for ax.scatter.
+    im_kws : dict, optional
+        Keyword arguments for ax.imshow.
     dpi : int or None, optional
         Figure dots per inch. If None, default to matplotlib.rcParams['figure.dpi'].
     scale : float, optional
@@ -126,27 +73,35 @@ def trajectory_2d(
     axes : matplotlib Axes
         Axes on which the trajectories are plotted.
     """
-    if not (tracks.ndim == 3 and tracks.shape[-1] == 3):
-        raise ValueError('tracks must be a (N, L, 3) array')
-    if tracks.shape[0] < 1:
-        raise ValueError('tracks has zero length')
+    if not pd.Series(['x','y','t','trackid']).isin(tracks.columns).all():
+        raise ValueError('tracks must have columns x, y, t, and trackid')
+    if len(tracks) < 1:
+        raise ValueError('tracks must have at least one row')
     if image is not None:
         if not (image.ndim == 2 or image.ndim == 3):
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
         if image.ndim == 4 and not (image.shape[-1] == 3 or image.shape[-1] == 4):
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
-    if labels is not None and labels.shape != (len(tracks),):
-        raise ValueError('labels must have shape ({},)'.format(len(tracks)))
-    if color not in ('z', 'label', None):
-        raise ValueError('color must be "z", "label", or None')
+    if labels is not None and len(set(tracks['trackid']) - set(labels['trackid'])) != 0:
+        raise ValueError('there must be a label for each trajectory')
+    if color not in ('t', 'label', None):
+        raise ValueError('color must be "t", "label", or None')
     if color == 'label' and labels is None:
         raise ValueError('labels cannot be None if color == "label"')
     if color is None and cbar:
         raise ValueError('cbar must be False when color == None')
 
+    # map trackids to their label
+    if labels is not None:
+        labels = dict(zip(labels['trackid'], labels['label']))
+
+    tracks = tracks.sort_values(['trackid', 't'])
+
+    # set some default values
     dpi = matplotlib.rcParams['figure.dpi'] if dpi is None else dpi
     cmap = 'viridis' if cmap is None else cmap
 
+    # set up keyword arguments
     line_kws = {} if line_kws is None else line_kws.copy()
     line_kws.setdefault('linewidths', 1.5)
     line_kws.setdefault('alpha', 0.8)
@@ -158,14 +113,16 @@ def trajectory_2d(
     scat_kws.setdefault('linewidths', 0.2)
     scat_kws.setdefault('c', 'black')
 
+    im_kws = {} if im_kws is None else im_kws.copy()
+
     # compute x and y limits
     if xlim is None:
-        xlim = (tracks[:, :, 0].min(), tracks[:, :, 0].max())
+        xlim = (tracks['x'].min(), tracks['x'].max())
         if image is not None:
             height, width = image.shape[:2]
             xlim = (min(0, xlim[0]), max(width, xlim[1]))
     if ylim is None:
-        ylim = (tracks[:, :, 1].min(), tracks[:, :, 1].max())
+        ylim = (tracks['y'].min(), tracks['y'].max())
         if image is not None:
             height, width = image.shape[:2]
             ylim = (min(0, ylim[0]), max(height, ylim[1]))
@@ -173,46 +130,57 @@ def trajectory_2d(
     # determine size of main axes
     width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
     axsize = (np.array((width, height)) * scale).astype(np.int)
-    # print('axsize: {}'.format(axsize))
+    print('axsize: {}'.format(axsize))
 
     grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 40, 40, 40, 10)
     grid.ax.set_aspect('equal')
     grid.ax.set_xlim(xlim)
     grid.ax.set_ylim(ylim[::-1])   # invert y axis
 
-    # draw lines
-    if color == 'label':
-        linedata = tracks[:, :, :2]
-        colordata = labels
-        # TODO: Check that labels are strictly increasing and ints
-        labels_unique = np.unique(labels)
-        N = len(labels_unique)
-        line_kws['cmap'] = plt.get_cmap(cmap, N)
-    elif color == 'z':
-        segments = trackviz.tools.tracks_to_segments(tracks)
-        linedata = segments[:, :, :2]
-        colordata = segments[:, 0, 2]
-        line_kws['cmap'] = cmap
-    else:
-        linedata = tracks[:, :, :2]
-        colordata = None
+    # plot image
+    if image is not None:
+        grid.ax.imshow(image, **im_kws)
 
-    lc = LineCollection(linedata, **line_kws)
-    if colordata is not None:
-        lc.set_array(colordata)
+    # set parameters for plotting trajectories
+    if color == 'label':
+        tracklines, trackids = trackviz.tools.tracks_to_lines(tracks, dims=2, return_trackid=True)
+
+        # use indices of sorted labels to map labels to colors
+        tracklabels = np.array([labels[tid] for tid in trackids])
+        label_values, tracklabel_inds = np.unique(tracklabels, return_inverse=True)
+        N = len(label_values)
+
+        discrete_cmap = plt.get_cmap(cmap, N)
+        norm = BoundaryNorm(np.linspace(-0.5, N-0.5, N+1), N)
+
+        line_kws.update(segments=tracklines, cmap=discrete_cmap, norm=norm)
+        colordata = tracklabel_inds
+    elif color == 't':
+        tracklines = trackviz.tools.tracks_to_lines(tracks, dims=3, return_trackid=False)
+        segments = np.concatenate([trackviz.tools.line_to_segments(line) for line in tracklines], axis=0)
+
+        line_kws.update(segments=segments[:, :, :2])
+        colordata = segments[:, 0, 2]  # use t value of first point of segment to determine color of line
+    else:
+        tracklines = trackviz.tools.tracks_to_lines(tracks, dims=2, return_trackid=False)
+        line_kws.update(segments=tracklines)
+
+    # plot trajectories
+    lc = LineCollection(**line_kws)
+    if color == 'label' or color == 't':
+        lc.set_array(colordata)  # set values that will be mapped to RGBA using cmap
     grid.ax.add_collection(lc)
+
+    if cbar:
+        if color == 'label':
+            cb = grid.ax.figure.colorbar(lc, cax=grid.cax, ticks=range(N))
+            cb.set_ticklabels(label_values)
+        elif color == 't':
+            cb = grid.ax.figure.colorbar(lc, cax=grid.cax)
 
     # draw points
     if show_points:
-        grid.ax.scatter(tracks[:, :, 0], tracks[:, :, 1], **scat_kws)
-
-    # draw colorbar
-    if cbar and color == 'label':
-        # see https://gist.github.com/jakevdp/91077b0cae40f8f8244a
-        cb = grid.ax.figure.colorbar(lc, cax=grid.cax, ticks=range(N))
-        lc.set_clim(-0.5, N - 0.5)
-    elif cbar and color == 'z':
-        cb = grid.ax.figure.colorbar(lc, cax=grid.cax)
+        grid.ax.scatter(tracks['x'], tracks['y'], **scat_kws)
 
     return grid.fig, grid.ax
 
