@@ -91,7 +91,6 @@ def trajectory_2d(
     if color is None and cbar:
         raise ValueError('cbar must be False when color == None')
 
-    # map trackids to their label
     if labels is not None:
         labels = dict(zip(labels['trackid'], labels['label']))
 
@@ -159,7 +158,7 @@ def trajectory_2d(
         tracklines = trackviz.tools.tracks_to_lines(tracks, dims=3, return_trackid=False)
         segments = np.concatenate([trackviz.tools.line_to_segments(line) for line in tracklines], axis=0)
 
-        line_kws.update(segments=segments[:, :, :2])
+        line_kws.update(segments=segments[:, :, :2], cmap=cmap)
         colordata = segments[:, 0, 2]  # use t value of first point of segment to determine color of line
     else:
         tracklines = trackviz.tools.tracks_to_lines(tracks, dims=2, return_trackid=False)
@@ -191,8 +190,8 @@ def trajectory_2d(
 def trajectory_3d(
     tracks,
     labels=None,
-    color='z',
-    xlim=None, ylim=None, zlim=None,
+    color=None,
+    xlim=None, ylim=None, tlim=None,
     cmap=None,
     line_kws=None,
 ):
@@ -201,18 +200,19 @@ def trajectory_3d(
 
     Parameters
     ----------
-    tracks : ndarray, shape (N, L, 3)
-        Trajectory coordinates. There are N tracks, where each track has L (x, y, z) points.
-    labels : ndarray, shape (N,), dtype int, optional
-        Trajectory labels. Will be used to color trajectories.
-    color : {'z', 'label', None}
-        Value(s) used to color trajectories. If `color` == 'z', color each line segment of each trajectory according
-        to its z value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
+    tracks : pandas.DataFrame, columns (x, y, t, trackid)
+        Trajectory data. Each row in `tracks` is a point in a trajectory, where each trajectory has a unique trackid.
+    labels : pandas.DataFrame, columns (trackid, label)
+        Trajectory labels used to color trajectories if `color` == `label`. There must be a label for each trajectory
+        in `tracks`. Can contain integers or strings.
+    color : {None, 't', 'label'}
+        Value(s) used to color trajectories. If `color` == 't', color each line segment of each trajectory according
+        to its t value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
         color the trajectories.
-    xlim, ylim, zlim : list, shape (2,) optional
-        Data limits for the x, y, and z axis. If no limits are given, they will be computed from the data.
+    xlim, ylim, tlim : list, shape (2,) optional
+        Data limits for the x, y, and t axis. If no limits are given, they will be computed from the data.
     cmap : matplotlib colormap name or object, optional
-        Colormap used to map z coordinates to colors. Ignored if `labels` is not None.
+        Colormap used to map t coordinates to colors. Ignored if `labels` is not None.
     line_kws : dict, optional
         Keyword arguments passed to matplotlib LineCollection.
 
@@ -223,28 +223,27 @@ def trajectory_3d(
     axes : matplotlib Axes
         Axes on which the trajectories are plotted.
     """
-    if not (tracks.ndim == 3 and tracks.shape[-1] == 3):
-        raise ValueError('tracks must be a (N, L, 3) array')
-    if tracks.shape[0] < 1:
-        raise ValueError('tracks has zero length')
-    if labels is not None and labels.shape != (len(tracks),):
-        raise ValueError('labels must have same length as tracks ({},)'.format(len(tracks)))
-    if color not in ('z', 'label', None):
-        raise ValueError('color must be "z", "label", or None')
+    if not pd.Series(['x','y','t','trackid']).isin(tracks.columns).all():
+        raise ValueError('tracks must have columns x, y, t, and trackid')
+    if len(tracks) < 1:
+        raise ValueError('tracks must have at least one row')
+    if labels is not None and len(set(tracks['trackid']) - set(labels['trackid'])) != 0:
+        raise ValueError('there must be a label for each trajectory')
+    if color not in ('t', 'label', None):
+        raise ValueError('color must be "t", "label", or None')
     if color == 'label' and labels is None:
         raise ValueError('labels cannot be None if color == "label"')
 
-    X = tracks[:, :, 0]
-    Y = tracks[:, :, 1]
-    Z = tracks[:, :, 2]
+    if labels is not None:
+        labels = dict(zip(labels['trackid'], labels['label']))
 
     line_kws = {} if line_kws is None else line_kws.copy()
     cmap = 'viridis' if cmap is None else cmap
 
     # compute axis limits
-    xlim = xlim if xlim else [np.floor(X.min()), np.ceil(X.max())]
-    ylim = ylim if ylim else [np.floor(Y.min()), np.ceil(Y.max())][::-1]  # invert y axis
-    zlim = zlim if zlim else [np.floor(Z.min()), np.ceil(Z.max())]
+    xlim = xlim if xlim else [np.floor(tracks['x'].min()), np.ceil(tracks['x'].max())]
+    ylim = ylim if ylim else [np.floor(tracks['y'].min()), np.ceil(tracks['y'].max())][::-1]  # invert y axis
+    zlim = tlim if tlim else [np.floor(tracks['t'].min()), np.ceil(tracks['t'].max())]
 
     fig = plt.figure()
     ax = fig.add_axes((0, 0, 1, 1), projection='3d')
@@ -253,26 +252,32 @@ def trajectory_3d(
     ax.set_ylim3d(ylim)
     ax.set_zlim3d(zlim)
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('t')
 
+    # set values needed to plot trajectories
+    tracklines, trackids = trackviz.tools.tracks_to_lines(tracks, dims=3, return_trackid=True)
     if color == 'label':
-        linedata = tracks
-        colordata = labels
-        # TODO: Check that labels are strictly increasing and ints
-        N = len(np.unique(labels))
-        line_kws['cmap'] = plt.get_cmap(cmap, N)
-    elif color == 'z':
-        linedata = trackviz.tools.tracks_to_segments(tracks)
-        colordata = linedata[:, 0, 2]
-        line_kws['cmap'] = cmap
-    else:
-        linedata = tracks
-        colordata = None
+        tracklabels = np.array([labels[tid] for tid in trackids])
+        label_values, tracklabel_inds = np.unique(tracklabels, return_inverse=True)
+        N = len(label_values)
 
-    lc = Line3DCollection(linedata, **line_kws)
-    if colordata is not None:
+        discrete_cmap = plt.get_cmap(cmap, N)
+        norm = BoundaryNorm(np.linspace(-0.5, N-0.5, N+1), N)
+
+        line_kws.update(segments=tracklines, cmap=discrete_cmap, norm=norm)
+        colordata = tracklabel_inds
+    elif color == 't':
+        segments = np.concatenate([trackviz.tools.line_to_segments(line) for line in tracklines], axis=0)
+
+        line_kws.update(segments=segments, cmap=cmap)
+        colordata = segments[:, 0, 2]  # use t value of first point of segment to determine color of line
+    else:
+        line_kws.update(segments=tracklines)
+
+    lc = Line3DCollection(**line_kws)
+    if color == 'label' or color == 't':
         lc.set_array(colordata)
     ax.add_collection3d(lc)
 
