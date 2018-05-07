@@ -14,5 +14,5 @@ fig, ax = trackviz.static.trajectory_2d(
     line_kws=dict(linewidths=0.8),
     im_kws=dict(interpolation='none')
 )
-fig.savefig('output/static_trajectory_2d_image.png')
+fig.savefig('output/static_2d_image.png')
 # plt.show()

@@ -18,5 +18,5 @@ fig, ax = trackviz.static.trajectory_3d(
     tracks, labels=labels, color='label',
     line_kws=dict(linewidths=0.5)
 )
-fig.savefig('output/static_trajectory_3d_color_labels.png')
+fig.savefig('output/static_3d_color_labels.png')
 # plt.show()
