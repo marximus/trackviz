@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from trackviz.tools import FigureAxes
 
 
-# TODO: Add trails parameter to which will not only show trajectories with a point in the current frame
+# TODO: Add trails parameter which will not only show trajectories with a point in the current frame
 class TrackAnimation2d:
     """
     Class for 2d animation of trajectories.
@@ -20,16 +20,8 @@ class TrackAnimation2d:
         Trajectory data.
     frames : ndarray, shape (L, H, W) or (L, H, W, 3) or (L, H, W, 4), optional
         Video frames to plot in background.
-    labels : ndarray, shape (N,), dtype int, optional
-        Trajectory labels. Will be used to color trajectories.
-    color : {None, 'frame', 'label'}
-        Value(s) used to color trajectories. If `color` == 'frame', color each line segment of each trajectory according
-        to its frame value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
-        color the trajectories. Default is None.
     xlim, ylim: list, shape (2,) optional
         Data limits for the x and y axis. If no limits are given, they will be computed from the data.
-    cmap : matplotlib colormap name or object, optional
-        Colormap used if color is not None.
     dpi : int or None, optional
         Figure dots per inch. If None, default to matplotlib.rcParams['figure.dpi'].
     scale : float, optional
@@ -46,21 +38,7 @@ class TrackAnimation2d:
     ax : matplotlib Axes
         Main Axes.
     """
-    def __init__(
-            self,
-            tracks,
-            frames=None,
-            labels=None,
-            color=None,
-            xlim=None, ylim=None,
-            cmap=None,
-            cbar=False,
-            cbar_width=30,
-            dpi=None,
-            scale=1.,
-            line_kws=None,
-            frames_kws=None
-    ):
+    def __init__(self, tracks, frames=None, scale=1., dpi=None, xlim=None, ylim=None, line_kws=None, frames_kws=None):
         if not (isinstance(tracks, pd.DataFrame) and all(x in tracks.columns for x in ('trackid', 'frame', 'x', 'y'))):
             raise ValueError('tracks must be pandas.DataFrame with columns "trackid", "frame", "x", and "y"')
         if frames is not None:
@@ -68,14 +46,6 @@ class TrackAnimation2d:
                 raise ValueError('frames must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
             if frames.ndim == 4 and not (frames.shape[-1] == 3 or frames.shape[-1] == 4):
                 raise ValueError('frames must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
-        if color not in ('frame', 'label', None):
-            raise ValueError('color must be "frame", "label", or None')
-        if color == 'label' and labels is None:
-            raise ValueError('labels cannot be None if color == "label"')
-        if color is None and cbar:
-            raise ValueError('cbar must be False when color == None')
-        if color is not None:
-            raise ValueError('only color=None is currently supported')
 
         tracks = tracks.sort_values(['trackid', 'frame'])
         tracks['pointid'] = tracks.groupby('trackid').cumcount()
@@ -111,12 +81,12 @@ class TrackAnimation2d:
         if frames is not None:
             framelim = (min(0, framelim[0]), max(len(frames), framelim[1]))
 
-        # determine size of output
+        # determine size of output in pixels
         width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
         axsize = (np.array((width, height)) * scale).astype(np.int)
 
         # set up figure and axes
-        grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 0, 0, 0, 0, fig_func=Figure)
+        grid = FigureAxes(axsize, 20, dpi, False, 0, 0, 0, 0, 0, fig_func=Figure)
         fig, ax = grid.fig, grid.ax
         FigureCanvasAgg(fig)
         grid.ax.set_aspect('equal')
