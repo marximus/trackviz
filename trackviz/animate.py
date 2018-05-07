@@ -29,11 +29,7 @@ class TrackAnimation2d:
     xlim, ylim: list, shape (2,) optional
         Data limits for the x and y axis. If no limits are given, they will be computed from the data.
     cmap : matplotlib colormap name or object, optional
-        Colormap used to map frame coordinates to colors. Ignored if `labels` is not None.
-    cbar : bool, optional
-        Whether to draw a colorbar. Must be False if `color` == None, because no colormapping is used.
-    cbar_width : int
-        Width of colorbar (in pixels).
+        Colormap used if color is not None.
     dpi : int or None, optional
         Figure dots per inch. If None, default to matplotlib.rcParams['figure.dpi'].
     scale : float, optional
@@ -49,8 +45,6 @@ class TrackAnimation2d:
         Figure containing trajectory plot.
     ax : matplotlib Axes
         Main Axes.
-    cax : matplotlib Axes
-        Colorbar Axes.
     """
     def __init__(
             self,
@@ -60,7 +54,7 @@ class TrackAnimation2d:
             color=None,
             xlim=None, ylim=None,
             cmap=None,
-            cbar=None,
+            cbar=False,
             cbar_width=30,
             dpi=None,
             scale=1.,
@@ -90,6 +84,7 @@ class TrackAnimation2d:
         n_tracks = len(tracks['trackid'].unique())
         dpi = matplotlib.rcParams['figure.dpi'] if dpi is None else dpi
 
+        # set up keyword arguments
         line_kws = {} if line_kws is None else line_kws.copy()
         line_kws.update(animated=True)
 
@@ -116,24 +111,24 @@ class TrackAnimation2d:
         if frames is not None:
             framelim = (min(0, framelim[0]), max(len(frames), framelim[1]))
 
-        # determine size of main axes
+        # determine size of output
         width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
         axsize = (np.array((width, height)) * scale).astype(np.int)
 
         # set up figure and axes
-        grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 40, 40, 40, 10, fig_func=Figure)
-        FigureCanvasAgg(grid.fig)
+        grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 0, 0, 0, 0, fig_func=Figure)
+        fig, ax = grid.fig, grid.ax
+        FigureCanvasAgg(fig)
         grid.ax.set_aspect('equal')
         grid.ax.set_xlim(xlim)
         grid.ax.set_ylim(ylim)
 
         lines = {trackid: Line2D([], [], **line_kws) for trackid in tracks['trackid'].unique()}
 
-        im = grid.ax.imshow(np.zeros_like(frames[0]), **frames_kws) if frames is not None else None
+        im = ax.imshow(np.zeros_like(frames[0]), **frames_kws) if frames is not None else None
 
-        self.figure = grid.fig
-        self.ax = grid.ax
-        self.cax = grid.cax
+        self.figure = fig
+        self.ax = ax
         self.dpi = dpi
 
         self._framelim = framelim
@@ -141,6 +136,7 @@ class TrackAnimation2d:
         self._tracks = tracks
         self._frames = frames
 
+        # artists on plot that will be updated
         self._lines = lines
         self._im = im
 
@@ -173,7 +169,6 @@ class TrackAnimation2d:
         writer = animation.FFMpegWriter(fps=fps, bitrate=bitrate, codec=codec)
         with writer.saving(self.figure, filename, self.dpi):
             for frame_idx in range(self._framelim[0], self._framelim[1]+1):
-                print('frame {}'.format(frame_idx))
                 self._draw_frame(frame_idx)
                 writer.grab_frame()
 

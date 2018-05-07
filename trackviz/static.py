@@ -128,7 +128,7 @@ def trajectory_2d(
     # determine size of main axes
     width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
     axsize = (np.array((width, height)) * scale).astype(np.int)
-    print('axsize: {}'.format(axsize))
+    # print('axsize: {}'.format(axsize))
 
     grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 40, 40, 40, 10)
     grid.ax.set_aspect('equal')

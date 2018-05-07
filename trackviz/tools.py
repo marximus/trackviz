@@ -12,11 +12,11 @@ class FigureAxes:
     ax_size : tuple, (width, height)
         Width and height of Axes (in pixels).
     wspace : int
-        Space between colorbar and main Axes (in pixels).
+        Space between colorbar and main Axes (in pixels). Ignored if `cbar` is False.
     cbar : bool
         If True, create an Axes for a colorbar.
     cbar_width : int
-        Width of colorbar (in pixels).
+        Width of colorbar (in pixels). Ignored if `cbar` is False.
     dpi : int
         Dots per inch.
     left, bottom, right, top : int
@@ -35,6 +35,7 @@ class FigureAxes:
     """
     def __init__(self, ax_size, wspace, dpi, cbar, cbar_width, left, bottom, right, top, fig_func=None):
         if not cbar:
+            wspace = 0
             cbar_width = 0
 
         # convert arguments from pixels to inches
