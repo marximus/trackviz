@@ -89,9 +89,10 @@ class TrackAnimation2d:
         grid = FigureAxes(axsize, 20, dpi, False, 0, 0, 0, 0, 0, fig_func=Figure)
         fig, ax = grid.fig, grid.ax
         FigureCanvasAgg(fig)
-        grid.ax.set_aspect('equal')
-        grid.ax.set_xlim(xlim)
-        grid.ax.set_ylim(ylim)
+        fig.set_frameon(False)
+        ax.set_aspect('equal')
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
 
         lines = {trackid: Line2D([], [], **line_kws) for trackid in tracks['trackid'].unique()}
 
