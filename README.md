@@ -18,7 +18,8 @@ pip install -e .
 
 ## Examples
 
-## Acknowledgments
+## Acknowledgements
+Data used in examples comes from [here](http://www.eecs.qmul.ac.uk/~andrea/thdt.html).
 
 ## License
 MIT License
