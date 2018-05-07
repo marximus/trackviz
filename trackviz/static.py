@@ -2,11 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import Divider, LocatableAxes, Size
 from matplotlib.collections import LineCollection
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.colors import BoundaryNorm
 
 
 import trackviz.tools
@@ -80,7 +79,7 @@ def trajectory_2d(
     if image is not None:
         if not (image.ndim == 2 or image.ndim == 3):
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
-        if image.ndim == 4 and not (image.shape[-1] == 3 or image.shape[-1] == 4):
+        if image.ndim == 3 and not (image.shape[-1] == 3 or image.shape[-1] == 4):
             raise ValueError('image must be (H, W), (H, W, 3) or (H, W, 4)')
     if labels is not None and len(set(tracks['trackid']) - set(labels['trackid'])) != 0:
         raise ValueError('there must be a label for each trajectory')
@@ -185,7 +184,6 @@ def trajectory_2d(
 
 
 # TODO: Add ability to draw colorbar
-# TODO: Better solution for setting aspect ratio of Axes that doesn't change range
 # TODO: Add show_points parameter
 def trajectory_3d(
     tracks,
