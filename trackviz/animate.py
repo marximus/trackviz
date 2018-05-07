@@ -18,14 +18,14 @@ class TrackAnimation2d:
     ----------
     tracks : pandas.DataFrame, columns ('trackid', 'frame', 'x', 'y')
         Trajectory data.
-    video : ndarray, shape (L, H, W) or (L, H, W, 3) or (L, H, W, 4), optional
+    frames : ndarray, shape (L, H, W) or (L, H, W, 3) or (L, H, W, 4), optional
         Video frames to plot in background.
     labels : ndarray, shape (N,), dtype int, optional
         Trajectory labels. Will be used to color trajectories.
     color : {None, 'frame', 'label'}
         Value(s) used to color trajectories. If `color` == 'frame', color each line segment of each trajectory according
         to its frame value. If `color == 'label', color each trajectory based on its label. If `color` == None, do not
-        color the trajectories.
+        color the trajectories. Default is None.
     xlim, ylim: list, shape (2,) optional
         Data limits for the x and y axis. If no limits are given, they will be computed from the data.
     cmap : matplotlib colormap name or object, optional
@@ -40,7 +40,7 @@ class TrackAnimation2d:
         Output size scale.
     line_kws : dict, optional
         Keyword arguments passed to matplotlib LineCollection.
-    video_kws : dict, optional
+    frames_kws : dict, optional
         Keyword arguments passed to ax.imshow.
 
     Attributes
@@ -55,7 +55,7 @@ class TrackAnimation2d:
     def __init__(
             self,
             tracks,
-            video=None,
+            frames=None,
             labels=None,
             color=None,
             xlim=None, ylim=None,
@@ -65,15 +65,15 @@ class TrackAnimation2d:
             dpi=None,
             scale=1.,
             line_kws=None,
-            video_kws=None
+            frames_kws=None
     ):
         if not (isinstance(tracks, pd.DataFrame) and all(x in tracks.columns for x in ('trackid', 'frame', 'x', 'y'))):
             raise ValueError('tracks must be pandas.DataFrame with columns "trackid", "frame", "x", and "y"')
-        if video is not None:
-            if not (video.ndim == 3 or video.ndim == 4):
-                raise ValueError('video must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
-            if video.ndim == 4 and not (video.shape[-1] == 3 or video.shape[-1] == 4):
-                raise ValueError('video must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
+        if frames is not None:
+            if not (frames.ndim == 3 or frames.ndim == 4):
+                raise ValueError('frames must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
+            if frames.ndim == 4 and not (frames.shape[-1] == 3 or frames.shape[-1] == 4):
+                raise ValueError('frames must be (L, H, W), (L, H, W, 3) or (L, H, W, 4)')
         if color not in ('frame', 'label', None):
             raise ValueError('color must be "frame", "label", or None')
         if color == 'label' and labels is None:
@@ -93,28 +93,28 @@ class TrackAnimation2d:
         line_kws = {} if line_kws is None else line_kws.copy()
         line_kws.update(animated=True)
 
-        video_kws = {} if video_kws is None else video_kws.copy()
-        video_kws.update(animated=True)
-        if video is not None and video.ndim == 3:  # is grayscale
-            video_kws.update(cmap='gray')
+        frames_kws = {} if frames_kws is None else frames_kws.copy()
+        frames_kws.update(animated=True)
+        if frames is not None and frames.ndim == 3:  # is grayscale
+            frames_kws.update(cmap='gray')
 
         # compute x and y limits
         if xlim is None:
             xlim = (tracks['x'].min(), tracks['x'].max())
-            if video is not None:
-                height, width = video.shape[1:3]
+            if frames is not None:
+                height, width = frames.shape[1:3]
                 xlim = (min(0, xlim[0]), max(width, xlim[1]))
         if ylim is None:
             ylim = (tracks['y'].min(), tracks['y'].max())
-            if video is not None:
-                height, width = video.shape[1:3]
+            if frames is not None:
+                height, width = frames.shape[1:3]
                 ylim = (min(0, ylim[0]), max(height, ylim[1]))
             ylim = ylim[::-1]  # invert y axis
 
         # compute frame limits
         framelim = (tracks['frame'].min(), tracks['frame'].max())
-        if video is not None:
-            framelim = (min(0, framelim[0]), max(len(video), framelim[1]))
+        if frames is not None:
+            framelim = (min(0, framelim[0]), max(len(frames), framelim[1]))
 
         # determine size of main axes
         width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
@@ -129,7 +129,7 @@ class TrackAnimation2d:
 
         lines = {trackid: Line2D([], [], **line_kws) for trackid in tracks['trackid'].unique()}
 
-        im = grid.ax.imshow(np.zeros_like(video[0]), **video_kws) if video is not None else None
+        im = grid.ax.imshow(np.zeros_like(frames[0]), **frames_kws) if frames is not None else None
 
         self.figure = grid.fig
         self.ax = grid.ax
@@ -139,7 +139,7 @@ class TrackAnimation2d:
         self._framelim = framelim
         self._n_tracks = n_tracks
         self._tracks = tracks
-        self._video = video
+        self._frames = frames
 
         self._lines = lines
         self._im = im
@@ -148,10 +148,10 @@ class TrackAnimation2d:
 
     def _draw_frame(self, frame_idx):
         # draw video frame
-        if self._video is not None:
-            if frame_idx < len(self._video):
-                self._im.set_data(self._video[frame_idx])
-            elif frame_idx == len(self._video):
+        if self._frames is not None:
+            if frame_idx < len(self._frames):
+                self._im.set_data(self._frames[frame_idx])
+            elif frame_idx == len(self._frames):
                 # self.ax.images.remove(self._im)
                 self._im.remove()
                 self._im = None
