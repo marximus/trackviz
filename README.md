@@ -19,16 +19,16 @@ pip install -e .
 ```
 
 ## Examples
-#### 2D
-##### Animation
+### 2D
+#### Animation
 ![](examples/output/animate_2d.gif)
-##### Static
+#### Static
 <img src="examples/output/static_2d_color_labels.png" height="320">
 
-#### 3D
-##### Animation
+### 3D
+#### Animation
 ![](examples/output/animate_3d.gif)
-##### Static
+#### Static
 <img src="examples/output/static_3d_color_labels.png" height="360">
 
 
