@@ -1,0 +1,44 @@
+language: generic
+
+os : linux
+
+env:
+  matrix:
+    - CONDA_PY=27
+    - CONDA_PY=35
+    - CONDA_PY=36
+
+install:
+  # Install Miniconda
+  - |
+    echo ""
+    echo "Installing a fresh version of Miniconda."
+    MINICONDA_URL="https://repo.continuum.io/miniconda"
+    MINICONDA_FILE="Miniconda3-latest-Linux-x86_64.sh"
+    curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
+    bash $MINICONDA_FILE -b
+
+  # Configure conda
+  - |
+    echo ""
+    echo "Configuring conda."
+    source /home/travis/miniconda3/bin/activate root
+    conda config --remove channels defaults
+    conda config --add channels defaults
+    conda config --add channels conda-forge
+    conda config --set show_channel_urls true
+    conda config --set auto_update_conda false
+
+  - conda install -n root --yes conda-build jinja2 anaconda-client
+
+  - conda info
+  - conda config --show-sources
+
+script:
+  # Build conda package
+  - conda build ./conda  # assumes recipe directory is conda
+
+  # Upload conda packages to Anaconda Cloud.
+  - PKG_PATH="$(conda build ./conda --output)"
+  - USER="mauricemarx"
+  - anaconda -t ${CONDA_UPLOAD_TOKEN} upload -u ${USER} --all --force ${PKG_PATH}
