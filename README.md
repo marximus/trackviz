@@ -18,11 +18,17 @@ pip install -e .
 
 ## Examples
 #### 2D
-![](examples/output/animate_2d_background.gif)
-![](examples/output/static_2d_color_labels.png)
+##### Animation
+![](examples/output/animate_2d.gif)
+##### Static
+<img src="examples/output/static_2d_color_labels.png" height="320">
+
 #### 3D
-![](examples/output/static_3d_color_labels.png)
+##### Animation
 ![](examples/output/animate_3d.gif)
+##### Static
+<img src="examples/output/static_3d_color_labels.png" height="360">
+
 
 ## Acknowledgements
 Data used in examples comes from [here](http://www.eecs.qmul.ac.uk/~andrea/thdt.html).
