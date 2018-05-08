@@ -26,7 +26,8 @@ def trajectory_2d(
     scat_kws=None,
     im_kws=None,
     dpi=None,
-    scale=1.
+    scale=1.,
+    margin=None
 ):
     """
     2d plot of trajectories.
@@ -64,6 +65,8 @@ def trajectory_2d(
         Figure dots per inch. If None, default to matplotlib.rcParams['figure.dpi'].
     scale : float, optional
         Output size scale.
+    margin : dict, keys ('left', 'right', 'bottom', 'top') , optional
+        Margin between plot elements and figure. Defaults are {'left': 40, 'bottom': 40, 'right': 40, 'top': 10}.
 
     Returns
     -------
@@ -113,6 +116,12 @@ def trajectory_2d(
 
     im_kws = {} if im_kws is None else im_kws.copy()
 
+    margin = {} if margin is None else margin.copy()
+    margin.setdefault('left', 0)
+    margin.setdefault('bottom', 0)
+    margin.setdefault('right', 25 if cbar else 0)
+    margin.setdefault('top', 0)
+
     # compute x and y limits
     if xlim is None:
         xlim = (tracks['x'].min(), tracks['x'].max())
@@ -130,8 +139,10 @@ def trajectory_2d(
     axsize = (np.array((width, height)) * scale).astype(np.int)
     # print('axsize: {}'.format(axsize))
 
-    grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width, 40, 40, 40, 10)
+    grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width,
+                      margin['left'], margin['bottom'], margin['right'], margin['top'])
     grid.ax.set_aspect('equal')
+    grid.ax.axis('off')
     grid.ax.set_xlim(xlim)
     grid.ax.set_ylim(ylim[::-1])   # invert y axis
 

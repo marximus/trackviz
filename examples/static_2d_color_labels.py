@@ -16,6 +16,7 @@ label = np.random.choice(['a', 'b', 'c'], size=len(trackid))
 labels = pd.DataFrame(dict(trackid=trackid, label=label))
 
 # plot
-fig, ax = trackviz.static.trajectory_2d(tracks, image=image, labels=labels, color='label', cbar=True)
+fig, ax = trackviz.static.trajectory_2d(tracks, image=image, labels=labels, color='label', cbar=True, scale=0.8)
+
 fig.savefig('output/static_2d_color_labels.png')
 # plt.show()
