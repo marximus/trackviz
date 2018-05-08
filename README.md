@@ -3,7 +3,7 @@ Trackviz is a Python library for visualizing trajectories in 2d/3d.
 
 ## Installation
 #### Conda
-[![Build Status](https://travis-ci.com/marximus/trackviz.svg?token=CtjJrWnW4aisgboytui7&branch=master)](https://travis-ci.com/marximus/trackviz)
+[![Build Status](https://travis-ci.com/marximus/trackviz.svg?branch=master)](https://travis-ci.com/marximus/trackviz)
 
 With [conda](https://conda.io/docs/index.html) installed, run
 ```
