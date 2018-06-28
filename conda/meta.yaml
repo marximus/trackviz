@@ -25,6 +25,7 @@ requirements:
     - matplotlib
     - seaborn
     - jupyter
+    - plotly
 
 test:
   imports:
