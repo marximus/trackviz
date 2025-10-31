@@ -20,9 +20,9 @@ setup(
     packages=['trackviz'],
     python_requires='>=3.9',
     install_requires=[
-        'numpy>=1.19.0',
-        'pandas>=1.1.0',
-        'matplotlib>=3.3.0',
+        'numpy>=2.0.0',
+        'pandas>=2.2.0',
+        'matplotlib>=3.8.0',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
