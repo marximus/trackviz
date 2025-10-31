@@ -136,7 +136,7 @@ def trajectory_2d(
 
     # determine size of main axes
     width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
-    axsize = (np.array((width, height)) * scale).astype(np.int)
+    axsize = (np.array((width, height)) * scale).astype(int)
     # print('axsize: {}'.format(axsize))
 
     grid = FigureAxes(axsize, 20, dpi, cbar, cbar_width,
@@ -162,20 +162,22 @@ def trajectory_2d(
         discrete_cmap = plt.get_cmap(cmap, N)
         norm = BoundaryNorm(np.linspace(-0.5, N-0.5, N+1), N)
 
-        line_kws.update(segments=tracklines, cmap=discrete_cmap, norm=norm)
+        line_kws.update(cmap=discrete_cmap, norm=norm)
+        segments_data = tracklines
         colordata = tracklabel_inds
     elif color == 't':
         tracklines = trackviz.tools.tracks_to_lines(tracks, dims=3, return_trackid=False)
         segments = np.concatenate([trackviz.tools.line_to_segments(line) for line in tracklines], axis=0)
 
-        line_kws.update(segments=segments[:, :, :2], cmap=cmap)
+        line_kws.update(cmap=cmap)
+        segments_data = segments[:, :, :2]
         colordata = segments[:, 0, 2]  # use t value of first point of segment to determine color of line
     else:
         tracklines = trackviz.tools.tracks_to_lines(tracks, dims=2, return_trackid=False)
-        line_kws.update(segments=tracklines)
+        segments_data = tracklines
 
     # plot trajectories
-    lc = LineCollection(**line_kws)
+    lc = LineCollection(segments_data, **line_kws)
     if color == 'label' or color == 't':
         lc.set_array(colordata)  # set values that will be mapped to RGBA using cmap
     grid.ax.add_collection(lc)
@@ -275,17 +277,19 @@ def trajectory_3d(
         discrete_cmap = plt.get_cmap(cmap, N)
         norm = BoundaryNorm(np.linspace(-0.5, N-0.5, N+1), N)
 
-        line_kws.update(segments=tracklines, cmap=discrete_cmap, norm=norm)
+        line_kws.update(cmap=discrete_cmap, norm=norm)
+        lines_data = tracklines
         colordata = tracklabel_inds
     elif color == 't':
         segments = np.concatenate([trackviz.tools.line_to_segments(line) for line in tracklines], axis=0)
 
-        line_kws.update(segments=segments, cmap=cmap)
+        line_kws.update(cmap=cmap)
+        lines_data = segments
         colordata = segments[:, 0, 2]  # use t value of first point of segment to determine color of line
     else:
-        line_kws.update(segments=tracklines)
+        lines_data = tracklines
 
-    lc = Line3DCollection(**line_kws)
+    lc = Line3DCollection(lines_data, **line_kws)
     if color == 'label' or color == 't':
         lc.set_array(colordata)
     ax.add_collection3d(lc)

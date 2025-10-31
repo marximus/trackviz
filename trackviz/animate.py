@@ -114,7 +114,7 @@ class TrackAnimation2d(TrackAnimation):
 
         # determine size of output in pixels
         width, height = np.fabs(xlim[0] - xlim[1]), np.fabs(ylim[0] - ylim[1])
-        axsize = (np.array((width, height)) * scale).astype(np.int)
+        axsize = (np.array((width, height)) * scale).astype(int)
 
         # set up figure and axes
         grid = FigureAxes(axsize, 20, self._dpi, False, 0, 0, 0, 0, 0, fig_func=Figure)

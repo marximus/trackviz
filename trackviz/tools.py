@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import Divider, LocatableAxes, Size
+from matplotlib.axes import Axes
+from mpl_toolkits.axes_grid1 import Divider, Size
 
 
 class FigureAxes:
@@ -52,12 +53,12 @@ class FigureAxes:
         horiz, vert = list(map(Size.Fixed, horiz)), list(map(Size.Fixed, vert))
         divider = Divider(fig, (0.0, 0.0, 1., 1.), horiz, vert, aspect=False)
 
-        ax = LocatableAxes(fig, divider.get_position())
+        ax = Axes(fig, divider.get_position())
         ax.set_axes_locator(divider.new_locator(nx=1, ny=1))
         fig.add_axes(ax)
 
         if cbar:
-            cax = LocatableAxes(fig, divider.get_position())
+            cax = Axes(fig, divider.get_position())
             cax.set_axes_locator(divider.new_locator(nx=3, ny=1))
             fig.add_axes(cax)
 
