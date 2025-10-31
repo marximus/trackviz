@@ -1,5 +1,5 @@
 {% set name = "trackviz" %}
-{% set version = "0.1" %}
+{% set version = "0.1.0" %}
 {% set user = "marximus" %}
 
 package:
@@ -16,15 +16,14 @@ build:
 
 requirements:
   build:
-    - python
+    - python >=3.9
     - pip
+    - setuptools >=61.0
   run:
-    - python
-    - ffmpeg
-    - imageio
-    - matplotlib
-    - seaborn
-    - jupyter
+    - python >=3.9
+    - numpy >=1.19.0
+    - pandas >=1.1.0
+    - matplotlib >=3.3.0
 
 test:
   imports:

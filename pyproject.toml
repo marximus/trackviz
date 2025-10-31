@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trackviz"
+version = "0.1.0"
+description = "Visualize trajectories in 2D and 3D using matplotlib"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Maurice Marx", email = "momomarx@gmail.com"}
+]
+keywords = ["trajectory", "visualization", "matplotlib", "tracking", "2d", "3d"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "numpy>=1.19.0",
+    "pandas>=1.1.0",
+    "matplotlib>=3.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/marximus/trackviz"
+Repository = "https://github.com/marximus/trackviz"
+Issues = "https://github.com/marximus/trackviz/issues"
