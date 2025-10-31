@@ -2,3 +2,9 @@
 .idea
 __pycache__/
 .ipynb_checkpoints/
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+*.egg
